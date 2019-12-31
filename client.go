@@ -191,7 +191,6 @@ func (c Client) put(resource string, body []byte) ([]byte, error) {
 
 // Processes a HTTP POST/PUT request
 func (c Client) processRequest(req *http.Request) ([]byte, error) {
-	log.Println("Called process")
 	if c.Token != nil {
 		c.checkAndRefresh(c.Token)
 	}
