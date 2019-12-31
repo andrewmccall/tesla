@@ -3,11 +3,14 @@ package tesla
 import (
 	"bytes"
 	"encoding/json"
-	. "github.com/smartystreets/goconvey/convey"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
+	"time"
+
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestClientSpec(t *testing.T) {
@@ -64,12 +67,12 @@ func TestTokenExpiredSpec(t *testing.T) {
 	}
 
 	Convey("Should have an expired token", t, func() {
-		So(client.TokenExpired(), ShouldBeTrue)
+		So(client.Token.IsExpired(), ShouldBeTrue)
 	})
 
 	client.Token = validToken
 	Convey("Should have a valid token", t, func() {
-		So(client.TokenExpired(), ShouldBeFalse)
+		So(client.Token.IsExpired(), ShouldBeFalse)
 	})
 
 }
@@ -93,7 +96,7 @@ func TestClientWithTokenSpec(t *testing.T) {
 	validToken := &Token{
 		AccessToken: "foo",
 		TokenType:   "bar",
-		ExpiresIn:   1,
+		ExpiresIn:   4000,
 		Expires:     99999999999,
 	}
 
@@ -108,6 +111,17 @@ func TestClientWithTokenSpec(t *testing.T) {
 	BaseURL = previousURL
 }
 
+type AuthBody struct {
+	GrantType    string `json:"grant_type"`
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
+	Email        string `json:"email"`
+	Password     string `json:"password"`
+	RefreshToken string `json:"refresh_token"`
+	URL          string
+	StreamingURL string
+}
+
 func serveHTTP(t *testing.T) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		body, _ := ioutil.ReadAll(req.Body)
@@ -115,18 +129,32 @@ func serveHTTP(t *testing.T) *httptest.Server {
 		switch req.URL.String() {
 		case "/oauth/token":
 			checkHeaders(t, req)
-			Convey("Request body should be set correctly", t, func() {
-				auth := &Auth{}
-				json.Unmarshal(body, auth)
-				So(auth.ClientID, ShouldEqual, "abc123")
-				So(auth.ClientSecret, ShouldEqual, "def456")
-				So(auth.Email, ShouldEqual, "elon@tesla.com")
-				So(auth.Password, ShouldEqual, "go")
-				So(auth.URL, ShouldEqual, BaseURL)
-				So(auth.StreamingURL, ShouldEqual, StreamingURL)
-			})
+			auth := &AuthBody{}
+			json.Unmarshal(body, auth)
+			switch auth.GrantType {
+			case "password":
+				// if the request is a password do this
+				Convey("Request body should be set correctly", t, func() {
+					So(auth.ClientID, ShouldEqual, "abc123")
+					So(auth.ClientSecret, ShouldEqual, "def456")
+					So(auth.Email, ShouldEqual, "elon@tesla.com")
+					So(auth.Password, ShouldEqual, "go")
+					So(auth.URL, ShouldEqual, BaseURL)
+					So(auth.StreamingURL, ShouldEqual, StreamingURL)
+				})
+			case "refresh_token":
+				Convey("Request body should be set correctly", t, func() {
+					So(auth.ClientID, ShouldEqual, "abc123")
+					So(auth.ClientSecret, ShouldEqual, "def456")
+					So(auth.RefreshToken, ShouldEqual, "xyz312")
+					So(auth.GrantType, ShouldEqual, "refresh_token")
+				})
+			}
 			w.WriteHeader(200)
-			w.Write([]byte("{\"access_token\": \"ghi789\"}"))
+
+			exp := strconv.FormatInt(time.Now().AddDate(0, 0, 1).Unix()-time.Now().Unix(), 10)
+
+			w.Write([]byte("{\"access_token\": \"ghi789\", \"refresh_token\": \"xyz312\", \"token_type\": \"access_token\", \"expires\":" + exp + "}"))
 		case "/api/1/vehicles":
 			checkHeaders(t, req)
 			w.WriteHeader(200)

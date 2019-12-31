@@ -1,6 +1,9 @@
 package tesla
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strconv"
+)
 
 // Represents the vehicle as returned from the Tesla API
 type Vehicle struct {
@@ -50,4 +53,18 @@ func (c *Client) Vehicles() (Vehicles, error) {
 		return nil, err
 	}
 	return vehiclesResponse.Response, nil
+}
+
+// Fetches the vehicle by ID associated to a Tesla account via the API
+func (c *Client) Vehicle(vehicleId int64) (*Vehicle, error) {
+	vehicle := &VehicleResponse{}
+	body, err := c.get(BaseURL + "/vehicles/" + strconv.FormatInt(vehicleId, 10))
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(body, vehicle)
+	if err != nil {
+		return nil, err
+	}
+	return vehicle.Response, nil
 }
