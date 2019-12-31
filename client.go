@@ -64,6 +64,10 @@ var (
 
 // Generates a new client for the Tesla API
 func NewClient(auth *Auth) (*Client, error) {
+	return NewClientWithHttpClient(auth, &http.Client{})
+}
+
+func NewClientWithHttpClient(auth *Auth, httpClient *http.Client) (*Client, error) {
 	if auth.URL == "" {
 		auth.URL = BaseURL
 	}
@@ -73,7 +77,7 @@ func NewClient(auth *Auth) (*Client, error) {
 
 	client := &Client{
 		Auth: auth,
-		HTTP: &http.Client{},
+		HTTP: httpClient,
 	}
 	token, err := client.authorize(auth)
 	if err != nil {
@@ -87,6 +91,11 @@ func NewClient(auth *Auth) (*Client, error) {
 
 // NewClientWithToken Generates a new client for the Tesla API using an existing token
 func NewClientWithToken(auth *Auth, token *Token) (*Client, error) {
+	return NewClientWithTokenAndHttpClient(auth, token, &http.Client{})
+}
+
+// NewClientWithToken Generates a new client for the Tesla API using an existing token
+func NewClientWithTokenAndHttpClient(auth *Auth, token *Token, httpClient *http.Client) (*Client, error) {
 	if auth.URL == "" {
 		auth.URL = BaseURL
 	}
@@ -96,7 +105,7 @@ func NewClientWithToken(auth *Auth, token *Token) (*Client, error) {
 
 	client := &Client{
 		Auth:  auth,
-		HTTP:  &http.Client{},
+		HTTP:  httpClient,
 		Token: token,
 	}
 	if client.Token.IsExpired() {
